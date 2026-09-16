@@ -1,0 +1,10 @@
+# Toolchain managed by Rokit — https://github.com/rojo-rbx/rokit
+#
+# Install everything listed here with:
+#     rokit install
+#
+# Add more tools with:
+#     rokit add <tool>
+
+[tools]
+wally = "UpliftGames/wally@0.3.2"

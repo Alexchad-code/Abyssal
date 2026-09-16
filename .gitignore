@@ -1,0 +1,25 @@
+# Build output — regenerate with tools/build.py
+dist/
+
+# Wally dependency installs
+Packages/
+.wally/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Luau tooling
+*.luac
+luau-analyze.log
+selene-report.json
+
+# Local scratch
+*.local.luau
+*.local.lua
+
+# Agent workspace metadata (memory, sessions) — not part of the project
+.workbuddy-ai/
