@@ -145,8 +145,16 @@ def _match_quoted(src: str, pos: int) -> int:
     return len(src)
 
 
-def strip_comments(src: str) -> str:
-    """Blank out comments only, preserving strings and length."""
+def remove_comments(src: str) -> str:
+    """Delete comments for real, unlike the length-preserving variant.
+
+    Line comments are dropped but their newline is kept, so tokens on either
+    side cannot be joined. Block comments collapse to a single space for the
+    same reason — `a--[[x]]b` must not become `ab`.
+
+    Line numbers shift, which is fine for a minified artefact and not fine for
+    anything you intend to debug.
+    """
     out: list[str] = []
     i = 0
     n = len(src)
@@ -157,16 +165,14 @@ def strip_comments(src: str) -> str:
         if ch == "-" and i + 1 < n and src[i + 1] == "-":
             end = _match_long_bracket(src, i + 2)
             if end is not None:
-                out.append(_blank(src[i:end]))
+                out.append(" ")
                 i = end
                 continue
 
             newline = src.find("\n", i + 2)
             if newline == -1:
-                out.append(_blank(src[i:]))
                 i = n
             else:
-                out.append(_blank(src[i:newline]))
                 i = newline
             continue
 
@@ -180,50 +186,6 @@ def strip_comments(src: str) -> str:
             end = _match_long_bracket(src, i)
             if end is not None:
                 out.append(src[i:end])
-                i = end
-                continue
-
-        out.append(ch)
-        i += 1
-
-    return "".join(out)
-
-
-def strip_comments_and_strings(src: str) -> str:
-    """Blank out comments and string literals, preserving length."""
-    out: list[str] = []
-    i = 0
-    n = len(src)
-
-    while i < n:
-        ch = src[i]
-
-        if ch == "-" and i + 1 < n and src[i + 1] == "-":
-            end = _match_long_bracket(src, i + 2)
-            if end is not None:
-                out.append(_blank(src[i:end]))
-                i = end
-                continue
-
-            newline = src.find("\n", i + 2)
-            if newline == -1:
-                out.append(_blank(src[i:]))
-                i = n
-            else:
-                out.append(_blank(src[i:newline]))
-                i = newline
-            continue
-
-        if ch in "\"'":
-            end = _match_quoted(src, i)
-            out.append(_blank(src[i:end]))
-            i = end
-            continue
-
-        if ch == "[":
-            end = _match_long_bracket(src, i)
-            if end is not None:
-                out.append(_blank(src[i:end]))
                 i = end
                 continue
 
@@ -379,7 +341,7 @@ def emit(modules: dict[str, Path], minify: bool, entry_id: str) -> str:
         source = path.read_text(encoding="utf-8")
 
         if minify:
-            source = strip_comments(source)
+            source = remove_comments(source)
 
         # function(...) rather than function(): a bundled chunk may reference
         # `...` at its top level, which is legal in a vararg function and a
@@ -399,7 +361,7 @@ def main() -> int:
     parser.add_argument(
         "--minify",
         action="store_true",
-        help="strip comments from module bodies (strings are preserved)",
+        help="remove comments from module bodies (strings are preserved)",
     )
     parser.add_argument(
         "--check",
