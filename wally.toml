@@ -1,9 +1,0 @@
-[package]
-name = "alexchad-code/abyssal"
-version = "0.1.0"
-registry = "https://github.com/UpliftGames/wally-index"
-realm = "shared"
-
-# Obsidian is vendored under vendor/obsidian rather than pulled from Wally,
-# because Abyssal patches the UI layer. See docs/ARCHITECTURE.md.
-[dependencies]

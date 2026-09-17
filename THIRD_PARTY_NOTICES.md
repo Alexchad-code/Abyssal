@@ -12,29 +12,27 @@ notices it requires.
 - **Copyright:** (c) 2025 deividcomsono
 - **Licence:** MIT
 
-**Vendored files:** `vendor/obsidian/Library.lua`, `vendor/obsidian/Library.d.luau`,
-`vendor/obsidian/addons/SaveManager.lua`, `vendor/obsidian/addons/ThemeManager.lua`.
+**Vendored files:** `libs/obsidian/Library.lua`, `libs/obsidian/Library.d.luau`,
+`libs/obsidian/addons/SaveManager.lua`, `libs/obsidian/addons/ThemeManager.lua`.
 
 **How the notice is retained.** MIT requires the copyright notice and permission
 notice to be included in all copies or substantial portions. That is satisfied in
-four places, so it survives bundling:
+three places:
 
-1. In full, in `vendor/obsidian/LICENSE`.
-2. As a header comment at the top of `vendor/obsidian/Library.lua` — this is the
-   file concatenated into the single-file build, so the notice travels with it
-   automatically.
-3. After the `--!strict` directive in `vendor/obsidian/Library.d.luau` — the
+1. In full, in `libs/obsidian/LICENSE`.
+2. As a header comment at the top of `libs/obsidian/Library.lua` — this is the
+   file that gets fetched and compiled at run time, so the notice travels with
+   it automatically.
+3. After the `--!strict` directive in `libs/obsidian/Library.d.luau` — the
    directive must remain on line 1 for Luau to honour it, so the notice cannot
-   be prepended.
-4. In the generated bundle header, emitted by `tools/build.py`.
+   be prepended above it.
 
-**Rule for bundlers.** Any script that concatenates `Library.lua` into a
-single-file build must not strip comments. If a minifier is added, it must
-re-emit the MIT notice into the minified output. A single-file `.lua` that
-people download *is* the distributed copy, so the notice belongs inside it.
-
-`tools/build.py` enforces this: the build fails if the notice is missing from
-the output.
+**If a bundler is ever added.** Any script that concatenates `Library.lua` into a
+single-file build must not strip comments, and a minifier must re-emit the MIT
+notice into its output. A single-file `.lua` that people download *is* the
+distributed copy, so the notice belongs inside it. Abyssal does not currently
+bundle — `main.lua` fetches `libs/obsidian/Library.lua` directly at run time, so
+the header comment is what carries the notice.
 
 ### MIT License
 

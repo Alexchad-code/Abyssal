@@ -1,9 +1,11 @@
 std = "roblox"
 
-# Roblox's own standard library covers the base API. Executor globals that the
-# hub relies on (getgenv, loadstring, HttpGet, identifyexecutor, ...) are not
-# part of that std, so they are declared as globals rather than silenced
-# project-wide. See docs/ARCHITECTURE.md for the executor surface we depend on.
+# Roblox's own standard library covers the base API. Executor globals are not
+# part of that std, so the ones Abyssal actually uses are declared here rather
+# than silenced project-wide — a typo in one of them should still be an error.
+#
+# If you start using another executor global, add it here. Do not add globals
+# speculatively; an unused declaration hides the mistake it would have caught.
 [[globals]]
 name = "getgenv"
 args = []
@@ -13,33 +15,5 @@ name = "loadstring"
 args = [{ type = "string" }]
 
 [[globals]]
-name = "identifyexecutor"
-args = []
-
-[[globals]]
-name = "getexecutorname"
-args = []
-
-[[globals]]
-name = "hookfunction"
-args = [{ type = "any" }, { type = "any" }]
-
-[[globals]]
-name = "getrawmetatable"
-args = [{ type = "any" }]
-
-[[globals]]
-name = "setreadonly"
-args = [{ type = "any" }, { type = "bool" }]
-
-[[globals]]
-name = "gethui"
-args = []
-
-[[globals]]
 name = "setclipboard"
-args = [{ type = "string" }]
-
-[[globals]]
-name = "queue_on_teleport"
 args = [{ type = "string" }]

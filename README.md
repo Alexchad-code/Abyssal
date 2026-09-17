@@ -2,124 +2,117 @@
 
 A multi-game Roblox script hub built on the [Obsidian](https://github.com/deividcomsono/Obsidian) UI library.
 
-The design goal is that adding a game is a copy-paste, not a refactor. The core
-knows nothing about any specific game; games are plug-in modules that declare
-which places they apply to and then contribute features.
+One entry script. One folder per game. No build step.
+
+## Using it
+
+Execute `main.lua`:
+
+```lua
+loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/main.lua"
+))()
+```
+
+It loads the UI library, works out which game you are in, and runs the matching
+script. Pushing to `main` is the release process — there is nothing to compile.
 
 ## Layout
 
 ```
-src/
-  init.luau                 Entry point — build App, register manifest, run
-  core/                     Game-agnostic framework
-    App.luau                Boot sequence and lifecycle owner
-    Context.luau            Shared services handed to every module
-    Registry.luau           Module collection and place-based resolution
-    Module.luau             Base class for a game module
-    Feature.luau            Stateful capability — a toggle with a lifecycle
-    Action.luau             One-shot command — a button
-    Signals.luau            Event bus
-    Config.luau             Persistence, backed by Obsidian's SaveManager
-    GameDetector.luau       Reports facts about the current server
-    Http.luau               Executor HTTP wrapper
-    Logger.luau             Scoped, levelled logging
-  ui/                       Obsidian integration
-    Obsidian.luau           Loads the vendored library and addons
-    Window.luau             Window facade, tab bookkeeping, widget rendering
-    Theme.luau              The Abyssal colour scheme
-  games/
-    init.luau               Module manifest — every game must be listed
-    universal/              Features that work anywhere
-    _template/              Copy this to add a game. Never loaded.
-vendor/obsidian/            The UI library (MIT). See THIRD_PARTY_NOTICES.md
-tools/
-  build.py                  Single-file bundler
-  tests/                    Headless test harness
-dist/                       Build output (gitignored)
+main.lua            Entry point. Everything starts here.
+libs/
+  obsidian/         The UI library. Third-party, MIT. Do not edit.
+assets/
+  obsidian/         Icons and textures, grouped by what uses them.
+games/
+  universal.lua     Runs in every game.
+  _template.lua     Copy this to add a game. Never loaded.
+docs/
+AGENTS.md           Instructions for AI agents working here.
+llms.txt            A map of this repo for language models.
 ```
-
-## Quickstart
-
-Requires Python 3.9+ for the build. No Roblox toolchain needed unless you want
-to run StyLua or Selene.
-
-```bash
-# Build the single-file script
-python tools/build.py
-
-# Strip comments too
-python tools/build.py --minify
-
-# Resolve the module graph without writing anything
-python tools/build.py --check
-```
-
-Output is `dist/Abyssal.lua`. Execute it with an executor's `loadstring`, or
-host it and use a loader.
 
 ## Adding a game
 
 ```bash
-cp -r src/games/_template src/games/your-game
+cp games/_template.lua games/your-game.lua
 ```
 
-Then:
+Write it, then add its place ID to the `GAMES` table in `main.lua`:
 
-1. Rename the `Id` and `Name` in `src/games/your-game/init.luau`.
-2. Put the game's place IDs in `PlaceIds`. List **every** place the module
-   should cover — lobby and main game are usually different IDs.
-3. Replace the example feature with real ones.
-4. Register it in `src/games/init.luau`.
-5. Rebuild.
-
-The template is heavily commented and is the reference for the shape a feature
-should take. `docs/ARCHITECTURE.md` explains why.
-
-## Testing
-
-The core framework runs headlessly. A mock Roblox environment stands in for the
-engine, so the lifecycle logic can be exercised without launching the game:
-
-```bash
-python tools/build.py --entry tools/tests/entry --out dist/Abyssal.test.lua
-luau dist/Abyssal.test.lua
+```lua
+local GAMES = {
+    [2753915549] = "blox-fruits",
+}
 ```
 
-`luau` is the standalone interpreter from
-[luau-lang/luau releases](https://github.com/luau-lang/luau/releases) — grab
-`luau-ubuntu.zip` / `luau-windows.zip` / `luau-macos.zip` and put it on your
-`PATH`. CI runs the same commands on every push.
+A game script is a function. `main.lua` hands it a context and that is the whole
+contract:
 
-Tests cover the invariants that are easy to break silently: that a feature
-which throws on enable does not leave its toggle claiming to be on, that
-`OnDisable` fully reverses `OnEnable`, that duplicate widget ids are rejected,
-and that module resolution sorts by priority rather than registration order.
+```lua
+return function(ctx)
+    local tab = ctx.Window:AddTab("Your Game", "gamepad-2")
+    local main = tab:AddGroupbox({ Side = "Left", Name = "Main" })
 
-Obsidian itself is not covered — it needs a real instance tree, and mocking one
-would test the mock.
+    main:AddToggle("yourgame.autoSell", {
+        Text = "Auto Sell",
+        Default = false,
+    }):OnChanged(function(enabled)
+        -- do something
+    end)
+
+    ctx.OnStop(function()
+        -- undo it
+    end)
+end
+```
+
+`games/_template.lua` is commented throughout and is the real reference.
+[docs/adding-a-game.md](docs/adding-a-game.md) walks through it.
+[docs/how-it-works.md](docs/how-it-works.md) explains the boot sequence.
 
 ## Conventions
 
-- **Module ids are paths.** `require("core/Logger")` resolves to
-  `src/core/Logger.luau`; `require("vendor/obsidian/Library")` resolves to
-  `vendor/obsidian/Library.lua`. Ids are repo-relative with `src/` stripped.
-- **Widget ids are global.** Prefix with the game: `yourgame.autoSell`, not
-  `autoSell`. Collisions are an error at registration, not a silent overwrite.
-- **Features own their teardown.** If `OnEnable` starts something, `OnDisable`
-  must stop it. `Module:Stop` relies on this during unload.
-- **Fail soft, report loud.** A feature that cannot start should raise; the base
-  class contains it and rolls the toggle back. A module that cannot find a
-  remote should log and continue.
-- **Comments explain why.** The code says what it does.
+- **Option ids are global.** `Library.Options` is one flat table for the whole
+  hub. Prefix ids with the game — `yourgame.autoSell`, never `autoSell`.
+- **Teardown is mandatory.** Anything started must be stoppable, and both exit
+  paths — the toggle going off, and the hub being unloaded — must reach the same
+  cleanup function. `ctx.OnStop` covers the second.
+- **Wire callbacks after creating the widget.** Never pass `Callback` in the
+  widget table; create it, then call `:OnChanged`.
+- **Throttle per-frame loops.** `Heartbeat` runs at frame rate.
+- **Fail soft, report loud.** `pcall` anything touching the game's own objects.
+  If a feature cannot run, say so and turn its toggle back off.
 
-## Licensing
+## Checking your changes
 
-Abyssal is MIT — see `LICENSE`.
+There is no test suite, and the code cannot be executed outside Roblox. The
+Luau toolchain will at least catch syntax and type errors:
 
-It bundles the Obsidian UI Library, also MIT. Obsidian's copyright notice is
-retained in `vendor/obsidian/LICENSE`, as a header comment in
-`vendor/obsidian/Library.lua`, and in the generated bundle. See
-`THIRD_PARTY_NOTICES.md` for the full text and the rules a bundler must follow.
+```bash
+luau-compile --null main.lua
+luau-analyze main.lua
+```
 
-Do not add third-party code without a licence. No licence means no permission,
-regardless of whether credit is given.
+`luau-analyze` reports `Unknown global 'game'` and similar for every Roblox and
+executor global — expected, they are not in Luau's default stdlib. Everything
+else it reports is real.
+
+Then load it in the game and click every widget you added.
+
+## For AI agents
+
+[AGENTS.md](AGENTS.md) has the context, the conventions, and the rules that are
+not obvious. [llms.txt](llms.txt) is a map of the repo.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+Abyssal bundles the Obsidian UI Library, also MIT. Its copyright notice is
+retained in `libs/obsidian/LICENSE` and as a header comment in
+`libs/obsidian/Library.lua`. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+**Do not add third-party code without a licence file.** No licence means all
+rights reserved, and crediting the author does not change that.

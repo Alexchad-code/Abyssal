@@ -1,0 +1,52 @@
+# Abyssal
+
+> A multi-game Roblox script hub built on the Obsidian UI library. One entry
+> script, one folder per game, no build step.
+
+Abyssal runs in a Roblox executor. It fetches its own UI library and the script
+for the current game from GitHub at run time, so pushing to `main` is the
+release process.
+
+Everything is Lua (Luau). There is no compiler, no package manager, and no
+bundler — deliberately. A game script is a single function that receives a
+context table and builds its own UI.
+
+## Core files
+
+- [main.lua](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/main.lua):
+  The entry point. Loads the UI library, builds the window, picks the game
+  script from the `GAMES` manifest, runs it, and owns the unload path.
+- [games/universal.lua](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/games/universal.lua):
+  Runs in every game. Rejoin, server hop, copy JobId, ping watchdog.
+- [games/_template.lua](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/games/_template.lua):
+  The reference for adding a game. Heavily commented. Never loaded.
+
+## Documentation
+
+- [AGENTS.md](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/AGENTS.md):
+  Instructions for AI agents. The `ctx` contract, the conventions, and the rules
+  that are not obvious. Read this first.
+- [README.md](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/README.md):
+  Overview and usage for humans.
+- [docs/adding-a-game.md](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/docs/adding-a-game.md):
+  Step by step, from copying the template to shipping.
+- [docs/how-it-works.md](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/docs/how-it-works.md):
+  What happens between execution and the window appearing.
+
+## Licensing
+
+- [THIRD_PARTY_NOTICES.md](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/THIRD_PARTY_NOTICES.md):
+  Obsidian's MIT notice and the rules a consumer must follow.
+- [LICENSE](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/LICENSE):
+  MIT.
+
+**Do not add third-party code without a licence file.** No licence means all
+rights reserved; attribution does not grant permission. This is stated at length
+in AGENTS.md because it has already caused a permanent account ban once.
+
+## Optional
+
+- [libs/obsidian/Library.lua](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/libs/obsidian/Library.lua):
+  The vendored UI library. Third-party; do not edit.
+- [libs/obsidian/Example.lua](https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/libs/obsidian/Example.lua):
+  Upstream's API example. The best reference for Obsidian's widget API.
