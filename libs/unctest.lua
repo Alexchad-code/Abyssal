@@ -1,24 +1,16 @@
 --[[
     libs/unctest.lua
 
-    Executor capability probe.
+    Executor capability probe, as a library.
 
     Roblox executors do not implement the same API. The community agreed on a
     naming standard (UNC — Unified Naming Convention) so scripts can target one
     set of names, but compliance is voluntary and varies wildly: one executor
     has a full filesystem and no signal support, the next is the reverse.
 
-    This script finds out what the executor you are running in actually
-    provides, so a feature can check before it calls something rather than
-    erroring halfway through.
-
-    ─── Run it ───────────────────────────────────────────────────────────────
-
-        loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/libs/unctest.lua"
-        ))()
-
-    It prints a report and returns the capability table.
+    So this reports what the executor you are running in actually provides, and
+    a feature checks before it calls something rather than erroring halfway
+    through.
 
     ─── Use it ───────────────────────────────────────────────────────────────
 
@@ -30,16 +22,45 @@
             ctx.Warn("this executor cannot copy to the clipboard")
         end
 
-        -- Or get a clear reason to show the user:
+        -- A clear reason to show the user, rather than a nil check:
         local fn, why = unc.Get("hookfunction")
         if not fn then ctx.Warn(why) end
 
-    ─── Output ───────────────────────────────────────────────────────────────
+        -- Hide a whole category when the executor cannot support it:
+        if not unc.Supports("Filesystem") then
+            hideTheConfigTab()
+        end
 
-    A function counts as present if it is a callable global. That is a
-    presence check, not a behaviour check — an executor can declare a function
-    that throws when called. Where that distinction matters (hookfunction,
-    request), the report flags it as "declared" so you know to test it yourself.
+    ─── API ──────────────────────────────────────────────────────────────────
+
+        Has(name)                -> boolean
+        Get(name)                -> function?, reason?
+        Missing()                -> { string }   everything absent
+        Executor()               -> string
+        Supports(category)       -> boolean      whole category present
+        CompleteCategories()     -> { string }
+        Categories()             -> { string }
+        Summary()                -> string       one line
+        Report()                 -> string       the full table
+        Print()                  -> ()           prints Report()
+        Invalidate()             -> ()           force a re-scan
+
+    ─── Nothing runs on load ─────────────────────────────────────────────────
+
+    The scan is lazy and cached, and nothing is printed. That is deliberate:
+    this is required by game scripts on every load, and a report in the console
+    each time would be noise. To see it, call Print() yourself.
+
+        loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/libs/unctest.lua"
+        ))().Print()
+
+    ─── Presence is not behaviour ────────────────────────────────────────────
+
+    A function counts as present if it is a callable global. An executor can
+    declare a function that throws when called. Where that distinction matters
+    (hookfunction, request, decompile), the report marks it "declared" so you
+    know to test it rather than trust the check.
 ]]
 
 local UNC = {}
@@ -430,27 +451,53 @@ function UNC.Executor(): string
     return current().executor
 end
 
--- The categories this executor has in full. Useful for deciding which features
--- to show at all, rather than showing them and failing on click.
+-- Every category name, sorted. Lua table order is not stable, so anything
+-- that renders these must sort — this does it once, here.
+function UNC.Categories(): { string }
+    local names = {}
+
+    for category in current().categories do
+        table.insert(names, category)
+    end
+
+    table.sort(names)
+
+    return names
+end
+
+--[[
+    True when every function in a category is present.
+
+    This is the one to reach for when deciding whether to show a feature area
+    at all. Showing a config tab that silently cannot save, because the
+    executor has no filesystem, is worse than not showing it.
+]]
+function UNC.Supports(category: string): boolean
+    local entries = current().categories[category]
+
+    if entries == nil then
+        return false
+    end
+
+    for _, entry in entries do
+        if not entry.supported then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- The categories this executor has in full.
 function UNC.CompleteCategories(): { string }
     local complete = {}
 
-    for category, entries in current().categories do
-        local allPresent = true
-
-        for _, entry in entries do
-            if not entry.supported then
-                allPresent = false
-                break
-            end
-        end
-
-        if allPresent then
+    for _, category in UNC.Categories() do
+        if UNC.Supports(category) then
             table.insert(complete, category)
         end
     end
 
-    table.sort(complete)
     return complete
 end
 
@@ -460,18 +507,18 @@ end
 
 -- ─────────────────────────────────────────────────────────────────── report
 
-local function line(text: string)
-    print(text)
-end
+local function buildReport(data: Report): { string }
+    local lines = {}
 
-function UNC.Print(target: Report?)
-    local data = target or current()
+    local function add(text: string)
+        table.insert(lines, text)
+    end
 
-    line("")
-    line("  Abyssal - executor capability report")
-    line(`  executor: {data.executor}   unctest v{UNC.Version}`)
-    line(`  {data.supported}/{data.total} functions present ({data.percent}%)`)
-    line("  " .. string.rep("-", 54))
+    add("")
+    add("  Abyssal - executor capability report")
+    add(`  executor: {data.executor}   unctest v{UNC.Version}`)
+    add(`  {data.supported}/{data.total} functions present ({data.percent}%)`)
+    add("  " .. string.rep("-", 54))
 
     -- Sort categories so output is stable between runs; Lua table order is not.
     local names = {}
@@ -492,7 +539,7 @@ function UNC.Print(target: Report?)
             end
         end
 
-        line(`  {category}  ({have}/{#entries})`)
+        add(`  {category}  ({have}/{#entries})`)
 
         for _, entry in entries do
             local mark = entry.supported and "yes" or "NO "
@@ -510,26 +557,55 @@ function UNC.Print(target: Report?)
                 note = `   <- provided as {alias}`
             end
 
-            line(`    [{mark}] {entry.name}{note}`)
+            add(`    [{mark}] {entry.name}{note}`)
         end
 
-        line("")
+        add("")
     end
 
     if #data.missing > 0 then
-        line(`  Missing ({#data.missing}): {table.concat(data.missing, ", ")}`)
+        add(`  Missing ({#data.missing}): {table.concat(data.missing, ", ")}`)
     else
-        line("  Everything in the list is present.")
+        add("  Everything in the list is present.")
     end
 
-    line("")
-    line("  Presence is not behaviour. Anything marked 'declared' can still throw")
-    line("  when called - test it before relying on it.")
-    line("")
+    add("")
+    add("  Presence is not behaviour. Anything marked 'declared' can still throw")
+    add("  when called - test it before relying on it.")
+    add("")
+
+    return lines
+end
+
+-- The full report as a string. Nothing is printed, so this is safe to call
+-- from a script that wants to show the result somewhere else — a notification,
+-- a textbox, a webhook.
+function UNC.Report(target: Report?): string
+    return table.concat(buildReport(target or current()), "\n")
+end
+
+-- A one-line version, for when the full table is too much.
+function UNC.Summary(): string
+    local data = current()
+
+    return `{data.executor}: {data.supported}/{data.total} functions ({data.percent}%)`
+end
+
+-- Prints the report. This is the "run it as a test" entry point; nothing is
+-- printed automatically, because this module is loaded by game scripts and a
+-- report in the console on every load is noise.
+function UNC.Print(target: Report?)
+    print(UNC.Report(target))
 end
 
 -- ───────────────────────────────────────────────────────────────────── main
 
-UNC.Print()
+--[[
+    Deliberately nothing runs here.
+
+    The scan is lazy — it happens on the first Has/Get/Report call and is
+    cached after that. Loading this module costs nothing and prints nothing,
+    which is what makes it safe to require from a game script on every load.
+]]
 
 return UNC
