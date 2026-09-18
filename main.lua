@@ -182,6 +182,17 @@ local ctx = {
     -- Set below once routing decides, and read by the game's main.lua.
     GameFolder = nil,
 
+    --[[
+        Tabs every game builds, loaded from libs/tabs.
+
+        They live here rather than in each game's tabs/ folder because they are
+        identical everywhere and one fix should not mean editing every game.
+        The list is here for the same reason — one copy, not one per game.
+
+        A game builds these first, then its own on top.
+    ]]
+    SharedTabs = { "home", "ui-settings" },
+
     -- Set by the game's main.lua.
     Window = nil,
     Configs = nil,

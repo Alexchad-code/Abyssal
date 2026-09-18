@@ -9,12 +9,21 @@
         1. read config.lua
         2. apply the configured theme, before anything is drawn
         3. create the window
-        4. load and build each tab from tabs/
-        5. set up config persistence, shared by every tab
+        4. build the shared tabs from libs/tabs
+        5. build this game's tabs from tabs/
+        6. set up config persistence, shared by every tab
 
-    ─── The contract ─────────────────────────────────────────────────────────
+    ─── Two kinds of tab ─────────────────────────────────────────────────────
 
-    A tab is a file in tabs/ returning:
+    Shared tabs — Home and UI Settings — live in libs/tabs and are built by
+    every game. They are identical everywhere, so one fix reaches all games
+    instead of needing an edit in each. The list is on ctx.SharedTabs, for the
+    same reason.
+
+    A game's own tabs live in this folder's tabs/ and are the only ones it
+    lists in config.Tabs.
+
+    Either way, a tab is a file returning:
 
         return {
             Name = "Home",          -- tab label
@@ -29,8 +38,10 @@
 
         cp -r games/template games/your-game
         -- edit config.lua (places, title)
-        -- edit tabs/, add your own
+        -- add your own tabs in tabs/
         -- register the folder in the loader's manifest
+
+    You should not need to touch the shared tabs, and should not copy them.
 
     ─── What this needs from ctx ─────────────────────────────────────────────
 
@@ -40,6 +51,7 @@
         ctx.OnStop(fn)
         ctx.Version     the hub version string, for the default footer
         ctx.GameFolder  this game's folder, e.g. "games/your-game"
+        ctx.SharedTabs  names of the shared tabs in libs/tabs
 
     It adds two fields for the tabs to use:
 
@@ -101,33 +113,50 @@ return function(ctx)
 
     -- ── 4. tabs ───────────────────────────────────────────────────────────
 
-    local names = config.Tabs or { "home" }
+    --[[
+        Tabs come from two places.
+
+        Shared tabs live in libs/tabs and are identical in every game, so a fix
+        to the Home tab lands everywhere at once instead of needing an edit in
+        each game. The list of them comes from ctx for the same reason — one
+        copy, not one per game.
+
+        A game's own tabs live in this folder's tabs/ and are the only ones it
+        declares in config.Tabs.
+    ]]
     local built, attempted = 0, 0
 
-    for _, name in names do
-        attempted += 1
+    local function buildTabs(source: string, names: { string })
+        for _, name in names do
+            attempted += 1
 
-        local definition, err = ctx.LoadFile(`{FOLDER}/tabs/{name}.lua`)
+            local definition, err = ctx.LoadFile(`{source}/{name}.lua`)
 
-        if definition == nil then
-            ctx.Warn(`tab "{name}": {err}`)
-        elseif type(definition) ~= "table" or type(definition.Build) ~= "function" then
-            ctx.Warn(`tab "{name}" must return a table with a Build function`)
-        else
-            -- One bad tab must not take the rest of the UI with it, so each is
-            -- built inside its own pcall.
-            local ok, tabErr = pcall(function()
-                local tab = window:AddTab(definition.Name or name, definition.Icon)
-                definition.Build(ctx, config, tab)
-            end)
-
-            if ok then
-                built += 1
+            if definition == nil then
+                ctx.Warn(`tab "{name}" from {source}: {err}`)
+            elseif type(definition) ~= "table" or type(definition.Build) ~= "function" then
+                ctx.Warn(`tab "{name}" must return a table with a Build function`)
             else
-                ctx.Warn(`tab "{name}" failed to build: {tostring(tabErr)}`)
+                -- One bad tab must not take the rest of the UI with it, so each
+                -- is built inside its own pcall.
+                local ok, tabErr = pcall(function()
+                    local tab = window:AddTab(definition.Name or name, definition.Icon)
+                    definition.Build(ctx, config, tab)
+                end)
+
+                if ok then
+                    built += 1
+                else
+                    ctx.Warn(`tab "{name}" failed to build: {tostring(tabErr)}`)
+                end
             end
         end
     end
+
+    -- Shared first, so Home and UI Settings are always at the front and a
+    -- game's own tabs follow.
+    buildTabs("libs/tabs", ctx.SharedTabs or {})
+    buildTabs(`{FOLDER}/tabs`, config.Tabs or {})
 
     -- ── 5. config persistence ─────────────────────────────────────────────
 

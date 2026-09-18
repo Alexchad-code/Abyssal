@@ -57,13 +57,17 @@ return {
     -- ─── tabs ─────────────────────────────────────────────────────────────
 
     --[[
-        Tab order. Each name is a file in this folder's tabs/ directory.
+        This game's own tabs, in the order they appear.
 
-        Every tab is its own script. To add one, drop a file in tabs/ and add
-        its name here — nothing else needs changing.
+        Home and UI Settings are NOT listed here. They are shared — built from
+        libs/tabs for every game, so a fix to one lands everywhere at once.
+        They always come first; whatever is listed here follows them.
+
+        Each name is a file in this folder's tabs/ directory. To add a tab,
+        drop a file there and add its name here.
     ]]
     Tabs = {
-        "home",
-        "ui-settings",
+        -- "auto-farm",
+        -- "misc",
     },
 }

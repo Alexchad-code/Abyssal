@@ -1,11 +1,11 @@
 --[[
-    games/template/tabs/home.lua
+    libs/tabs/home.lua
 
     The Home tab: who you are, and the utilities every game wants.
 
-    Premade and identical in every game. If you are copying the template to
-    make a new game you should not need to touch this file — put your own
-    things in their own tab instead.
+    Shared. Built by every game from libs/tabs, not copied into each one — so a
+    fix here reaches every game at once instead of needing an edit per game.
+    Games should not have their own copy of this file.
 
     Two boxes:
 

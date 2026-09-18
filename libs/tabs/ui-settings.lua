@@ -1,9 +1,11 @@
 --[[
-    games/template/tabs/ui-settings.lua
+    libs/tabs/ui-settings.lua
 
     The UI Settings tab: theme, and saving/loading everything else.
 
-    Premade. A new game should not need to touch this file.
+    Shared. Built by every game from libs/tabs, not copied into each one — so a
+    fix here reaches every game at once instead of needing an edit per game.
+    Games should not have their own copy of this file.
 
     ─── On the config prefix ─────────────────────────────────────────────────
 
@@ -11,8 +13,8 @@
     the prefix passed to Snapshot/Apply is empty. That is deliberate: options
     live in one flat table shared by the Home tab, this tab, the universal
     script and every game tab, and no single prefix covers them all. Configs
-    are already namespaced per place id by main.lua, so "everything" here means
-    "everything in this game", which is what a config is for.
+    are already namespaced per place id by the game's main.lua, so "everything"
+    here means "everything in this game", which is what a config is for.
 
     Loading skips any option that no longer exists, so a config saved before a
     feature was removed still loads the rest of itself.
