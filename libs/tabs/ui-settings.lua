@@ -16,13 +16,17 @@ return {
         local Themes = ctx.LoadFile("libs/Addons/themes.luau")
 
         if Themes == nil then
-            tab:AddGroupbox({ Side = "Left", Name = "Appearance" })
-                :AddLabel("themes.luau did not load.")
+            tab:AddGroupbox({ Side = "Left", Name = "Themes", IconName = "paintbrush" })
+                :AddLabel("themes.luau did not load")
         else
-            local appearance = tab:AddGroupbox({ Side = "Left", Name = "Appearance" })
+            local themesBox = tab:AddGroupbox({
+                Side = "Left",
+                Name = "Themes",
+                IconName = "paintbrush",
+            })
 
-            appearance:AddDropdown("ui.theme", {
-                Text = "Theme",
+            themesBox:AddDropdown("ui.theme", {
+                Text = "Theme list",
                 Values = Themes.Names(),
                 Default = Themes.Current() or (type(config.Theme) == "table" and config.Theme.Name) or "Abyssal",
                 Multi = false,
@@ -35,36 +39,85 @@ return {
                     notify(`Could not apply that theme: {err}`, 5)
                 end
             end)
+
+            themesBox:AddDivider()
+
+            themesBox:AddInput("ui.customTheme", {
+                Text = "Custom theme name",
+                Default = "",
+                Placeholder = "my theme",
+            })
+
+            local function hex(value: Color3): string
+                local function part(channel: number): string
+                    return string.format("%02x", math.floor(channel * 255 + 0.5))
+                end
+
+                return part(value.R) .. part(value.G) .. part(value.B)
+            end
+
+            themesBox:AddButton({
+                Text = "Save current as theme",
+                Tooltip = "Registers the colours on screen as a new theme.",
+                Func = function()
+                    local option = ctx.Options["ui.customTheme"]
+                    local name = option ~= nil and option.Value or nil
+
+                    if type(name) ~= "string" or name == "" then
+                        notify("Give the theme a name first.")
+                        return
+                    end
+
+                    local scheme = library.Scheme
+
+                    local ok = pcall(Themes.Register, name, {
+                        BackgroundColor = hex(scheme.BackgroundColor),
+                        MainColor = hex(scheme.MainColor),
+                        AccentColor = hex(scheme.AccentColor),
+                        OutlineColor = hex(scheme.OutlineColor),
+                        FontColor = hex(scheme.FontColor),
+                    })
+
+                    if not ok then
+                        notify("Could not register that theme.", 5)
+                        return
+                    end
+
+                    local dropdown = ctx.Options["ui.theme"]
+
+                    if dropdown ~= nil and dropdown.SetValues ~= nil then
+                        dropdown:SetValues(Themes.Names())
+                    end
+
+                    notify(`Saved theme "{name}"`)
+                end,
+            })
         end
 
-        local box = tab:AddGroupbox({ Side = "Right", Name = "Configs" })
+        local configsBox = tab:AddGroupbox({
+            Side = "Right",
+            Name = "Configuration",
+            IconName = "folder-cog",
+        })
+
         local configs = ctx.Configs
 
         if configs == nil then
-            box:AddLabel("configs.luau did not load.")
+            configsBox:AddLabel("configs.luau did not load, or this executor has no filesystem.")
             return
         end
 
-        local available, reason = configs:Available()
+        configsBox:AddInput("ui.configName", {
+            Text = "Config name",
+            Default = "default",
+            Placeholder = "default",
+        })
 
-        if not available then
-
-            box:AddLabel(`Unavailable: {reason}`)
-            box:AddLabel("Run libs/unctest.lua to see what this executor supports.")
-            return
-        end
-
-        local dropdown = box:AddDropdown("ui.config", {
-            Text = "Saved configs",
+        local list = configsBox:AddDropdown("ui.config", {
+            Text = "Config list",
             Values = configs:List(),
             Default = "",
             Multi = false,
-        })
-
-        box:AddInput("ui.configName", {
-            Text = "Name",
-            Default = "default",
-            Placeholder = "default",
         })
 
         local function refresh()
@@ -74,7 +127,7 @@ return {
                 names = { "" }
             end
 
-            dropdown:SetValues(names)
+            list:SetValues(names)
         end
 
         local function targetName(): string?
@@ -94,8 +147,8 @@ return {
             return name
         end
 
-        box:AddButton({
-            Text = "Save",
+        configsBox:AddButton({
+            Text = "Create config",
             Tooltip = "Writes every setting under this place id.",
             Func = function()
                 local name = targetName()
@@ -115,8 +168,10 @@ return {
             end,
         })
 
-        box:AddButton({
-            Text = "Load",
+        configsBox:AddDivider()
+
+        configsBox:AddButton({
+            Text = "Load config",
             Tooltip = "Applies a saved config.",
             DoubleClick = true,
             Func = function()
@@ -140,8 +195,8 @@ return {
             end,
         })
 
-        box:AddButton({
-            Text = "Delete",
+        configsBox:AddButton({
+            Text = "Delete config",
             Tooltip = "Removes the config file.",
             Risky = true,
             DoubleClick = true,
@@ -163,8 +218,8 @@ return {
             end,
         })
 
-        box:AddDivider()
+        configsBox:AddDivider()
 
-        box:AddLabel(`Stored in Abyssal/{tostring(game.PlaceId)}/`)
+        configsBox:AddLabel(`Stored in {configs:Directory()}/`)
     end,
 }

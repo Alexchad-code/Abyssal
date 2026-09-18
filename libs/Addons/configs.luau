@@ -3,6 +3,10 @@ local HttpService = game:GetService("HttpService")
 local Configs = {}
 Configs.__index = Configs
 
+-- Reserved name for hub state — window geometry, chosen theme. Kept out of
+-- List() so it never shows up as a user config.
+local STATE_NAME = "state"
+
 export type Options = {
     Folder: string,
     Game: string,
@@ -226,7 +230,7 @@ function Configs:List(): { string }
     for _, file in files do
         local name = tostring(file):match("([^/\\]+)%.json$")
 
-        if name ~= nil then
+        if name ~= nil and name ~= STATE_NAME then
             table.insert(names, name)
         end
     end
@@ -234,6 +238,14 @@ function Configs:List(): { string }
     table.sort(names)
 
     return names
+end
+
+function Configs:SaveState(data: { [string]: any }): (boolean, string?)
+    return self:Save(STATE_NAME, data)
+end
+
+function Configs:LoadState(): ({ [string]: any }?, string?)
+    return self:Load(STATE_NAME)
 end
 
 function Configs:Delete(name: string): (boolean, string?)

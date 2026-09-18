@@ -32,7 +32,7 @@ return function(ctx)
         end)
 
         if not ok or value == nil then
-            ctx.Warn(`unknown {tostring(enumType)} name "{name}"`)
+            ctx.Warn(`unknown {tostring(enumType)} "{name}"`)
             return fallback
         end
 
@@ -44,13 +44,8 @@ return function(ctx)
     local uiConfig = section("UI")
     local configsConfig = section("Configs")
 
-    -- Library-wide, so before the window exists.
     if type(uiConfig.ForceCheckbox) == "boolean" then
         library.ForceCheckbox = uiConfig.ForceCheckbox
-    end
-
-    if type(uiConfig.ShowToggleFrameInKeybinds) == "boolean" then
-        library.ShowToggleFrameInKeybinds = uiConfig.ShowToggleFrameInKeybinds
     end
 
     if type(uiConfig.DPI) == "number" and uiConfig.DPI > 0 then
@@ -59,23 +54,68 @@ return function(ctx)
         end)
     end
 
-    -- Theme, before the window is drawn.
+    -- Configs before the theme: saved state decides which theme to start on.
+    local Configs = ctx.LoadFile("libs/Addons/configs.luau")
+
+    if Configs == nil then
+        ctx.Warn("configs.luau did not load")
+    else
+        ctx.Configs = Configs.new({
+            Folder = configsConfig.Folder or "Abyssal",
+            Game = tostring(game.PlaceId),
+            Library = library,
+        })
+
+        local available, reason = ctx.Configs:Available()
+
+        if not available then
+            ctx.Warn(`configs: {reason}`)
+            ctx.Configs = nil
+        end
+    end
+
+    local state = {}
+
+    if ctx.Configs ~= nil then
+        local saved = ctx.Configs:LoadState()
+
+        if type(saved) == "table" then
+            state = saved
+        end
+    end
+
     local Themes = ctx.LoadFile("libs/Addons/themes.luau")
 
     if Themes == nil then
         ctx.Warn("themes.luau did not load")
-    elseif type(themeConfig.Name) == "string" then
-        local colors = themeConfig.Colors
+    else
+        local themeName = themeConfig.Name
 
-        if type(colors) == "table" and next(colors) ~= nil then
-            pcall(Themes.Register, themeConfig.Name, colors)
+        if themeConfig.Autoload == true and type(state.Theme) == "string" then
+            themeName = state.Theme
         end
 
-        local ok, err = Themes.Apply(library, themeConfig.Name)
+        if type(themeName) == "string" then
+            local colors = themeConfig.Colors
 
-        if not ok then
-            ctx.Warn(`theme: {err}`)
+            if type(colors) == "table" and next(colors) ~= nil then
+                pcall(Themes.Register, themeName, colors)
+            end
+
+            local ok, err = Themes.Apply(library, themeName)
+
+            if not ok then
+                ctx.Warn(`theme: {err}`)
+            end
         end
+    end
+
+    local size = offset(windowConfig.Size, UDim2.fromOffset(720, 600))
+    local position = offset(windowConfig.Position, UDim2.fromOffset(6, 6))
+
+    if windowConfig.SavePosition == true then
+        size = offset(state.Size, size)
+        position = offset(state.Position, position)
     end
 
     local animations = windowConfig.Animations == true
@@ -85,13 +125,11 @@ return function(ctx)
         Footer = windowConfig.Footer or ctx.Version or "",
         Icon = windowConfig.Icon,
 
-        Size = offset(windowConfig.Size, UDim2.fromOffset(720, 600)),
-        Position = offset(windowConfig.Position, UDim2.fromOffset(6, 6)),
+        Size = size,
+        Position = position,
         Center = windowConfig.Center ~= false,
         Resizable = windowConfig.Resizable ~= false,
-        AutoShow = windowConfig.AutoShow ~= false,
         AlwaysOnTop = windowConfig.AlwaysOnTop == true,
-        UnlockMouseWhileOpen = windowConfig.UnlockMouseWhileOpen ~= false,
 
         NotifySide = windowConfig.NotifySide or "Right",
         ShowCustomCursor = windowConfig.ShowCustomCursor ~= false,
@@ -99,16 +137,6 @@ return function(ctx)
 
         CornerRadius = windowConfig.CornerRadius or 4,
         Font = enumItem(Enum.Font, windowConfig.Font, Enum.Font.Code),
-        BackgroundImage = windowConfig.BackgroundImage or "",
-
-        GlobalSearch = windowConfig.GlobalSearch == true,
-        Snapping = windowConfig.Snapping == true,
-        EnableSidebarResize = windowConfig.EnableSidebarResize == true,
-        EnableCompacting = windowConfig.EnableCompacting ~= false,
-        SidebarCompacted = windowConfig.SidebarCompacted == true,
-
-        ShowMobileButtons = windowConfig.ShowMobileButtons ~= false,
-        MobileButtonsSide = windowConfig.MobileButtonsSide or "Left",
 
         Animations = {
             ToggleWindow = animations,
@@ -117,7 +145,6 @@ return function(ctx)
             Dropdown = animations,
             KeyPicker = animations,
         },
-        TabTransitionTime = windowConfig.TabTransitionTime or 0.22,
     })
 
     ctx.Window = window
@@ -152,22 +179,8 @@ return function(ctx)
     buildTabs("libs/tabs", ctx.SharedTabs or {})
     buildTabs(`{FOLDER}/tabs`, config.Tabs or {})
 
-    local Configs = ctx.LoadFile("libs/Addons/configs.luau")
-
-    if Configs == nil then
-        ctx.Warn("configs.luau did not load")
-    else
-        ctx.Configs = Configs.new({
-            Folder = configsConfig.Folder or "Abyssal",
-            Game = tostring(game.PlaceId),
-            Library = library,
-        })
-
-        local available, reason = ctx.Configs:Available()
-
-        if not available then
-            ctx.Warn(`configs: {reason}`)
-        elseif type(configsConfig.Autoload) == "string" and configsConfig.Autoload ~= "" then
+    if ctx.Configs ~= nil then
+        if type(configsConfig.Autoload) == "string" and configsConfig.Autoload ~= "" then
             local data, err = ctx.Configs:Load(configsConfig.Autoload)
 
             if data == nil then
@@ -175,6 +188,31 @@ return function(ctx)
             else
                 ctx.Configs:Apply("", data)
             end
+        end
+
+        if windowConfig.SavePosition == true or themeConfig.Autoload == true then
+            ctx.OnStop(function()
+                local out = {}
+
+                if windowConfig.SavePosition == true then
+                    local frame = window.MainFrame
+
+                    if frame ~= nil then
+                        out.Size = { frame.Size.X.Offset, frame.Size.Y.Offset }
+                        out.Position = { frame.Position.X.Offset, frame.Position.Y.Offset }
+                    end
+                end
+
+                if themeConfig.Autoload == true and Themes ~= nil then
+                    local current = Themes.Current()
+
+                    if type(current) == "string" then
+                        out.Theme = current
+                    end
+                end
+
+                ctx.Configs:SaveState(out)
+            end)
         end
     end
 

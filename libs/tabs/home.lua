@@ -12,14 +12,12 @@ return {
         local player = Players.LocalPlayer
 
         local watermark = type(config.Watermark) == "table" and config.Watermark or {}
-        local notifications = type(config.Notifications) == "table" and config.Notifications or {}
-        local defaultDuration = tonumber(notifications.Duration) or 4
 
         local function notify(text: string, duration: number?)
             library:Notify({
                 Title = "Abyssal",
                 Text = text,
-                Duration = duration or defaultDuration,
+                Duration = duration or 4,
             })
         end
 

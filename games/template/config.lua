@@ -11,9 +11,10 @@ return {
         Position = { 6, 6 },
         Center = true,
         Resizable = true,
-        AutoShow = true,
         AlwaysOnTop = false,
-        UnlockMouseWhileOpen = true,
+
+        -- Remember size and position between sessions.
+        SavePosition = true,
 
         NotifySide = "Right",
         ShowCustomCursor = true,
@@ -21,30 +22,20 @@ return {
 
         CornerRadius = 4,
         Font = "Code",
-        BackgroundImage = "",
-
-        GlobalSearch = false,
-        Snapping = false,
-        EnableSidebarResize = false,
-        EnableCompacting = true,
-        SidebarCompacted = false,
-
-        ShowMobileButtons = true,
-        MobileButtonsSide = "Left",
-
         Animations = false,
-        TabTransitionTime = 0.22,
     },
 
     Theme = {
         Name = "Abyssal",
         Colors = {},
+
+        -- Remember the theme picked in the UI Settings tab.
+        Autoload = true,
     },
 
     UI = {
         DPI = 100,
         ForceCheckbox = false,
-        ShowToggleFrameInKeybinds = true,
     },
 
     Watermark = {
@@ -58,10 +49,6 @@ return {
     Configs = {
         Folder = "Abyssal",
         Autoload = nil,
-    },
-
-    Notifications = {
-        Duration = 4,
     },
 
     Tabs = {},
