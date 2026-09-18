@@ -78,12 +78,14 @@ UNC.Version = "1.0.0"
 local CATEGORIES = {
     Environment = {
         "getgenv", "getrenv", "getreg", "getgc", "getgcinfo",
+        "getsenv", "getmenv", "getfenv", "setfenv", "loadstring",
     },
 
     Instances = {
         "getinstances", "getnilinstances", "getloadedmodules",
         "cloneref", "compareinstances", "isvalid", "iscached",
         "fireclickdetector", "fireproximityprompt", "firetouchinterest",
+        "isrenderobj", "getrenderproperty", "setrenderproperty",
     },
 
     Hooking = {
@@ -92,6 +94,7 @@ local CATEGORIES = {
         "newcclosure", "newlclosure", "iscclosure", "islclosure",
         "checkclosure", "isexecutorclosure",
         "getnamecallmethod", "setnamecallmethod", "getcallingscript",
+        "setreadonly", "isreadonly", "checkcaller",
     },
 
     Scripts = {
@@ -125,6 +128,16 @@ local CATEGORIES = {
         "getconnections", "firesignal", "getcallbackvalue",
     },
 
+    Mouse = {
+        "mousemoverel", "mousemoveabs",
+        "mouse1click", "mouse1press", "mouse1release",
+        "mouse2click", "mouse2press", "mouse2release",
+    },
+
+    Input = {
+        "keypress", "keyrelease", "iskeydown",
+    },
+
     Crypto = {
         "crypt", "base64_encode", "base64_decode", "sha256", "hmac",
     },
@@ -136,6 +149,7 @@ local CATEGORIES = {
     Misc = {
         "identifyexecutor", "getexecutorname", "getversion",
         "setfpscap", "getfpscap", "queue_on_teleport",
+        "getspecialinfo", "geturl",
     },
 }
 
@@ -146,13 +160,42 @@ local CATEGORIES = {
     a bare presence check would be misleading. The report marks them separately.
 ]]
 local UNRELIABLE = {
+    -- Hooking
     hookfunction = true,
     hookmetamethod = true,
+    setreadonly = true,
+
+    -- Network
     request = true,
     http_request = true,
-    firetouchinterest = true,
+
+    -- Scripts
     decompile = true,
     getscriptbytecode = true,
+
+    -- Environment
+    getsenv = true,
+    getmenv = true,
+
+    -- Rendering
+    isrenderobj = true,
+    getrenderproperty = true,
+    setrenderproperty = true,
+
+    -- Input automation. Frequently stubbed, and a stub that silently does
+    -- nothing is worse than a missing function, because the feature appears
+    -- to work and simply never fires.
+    mousemoverel = true,
+    mousemoveabs = true,
+    keypress = true,
+    keyrelease = true,
+
+    -- Instances
+    firetouchinterest = true,
+
+    -- Misc
+    getspecialinfo = true,
+    geturl = true,
 }
 
 --[[
@@ -194,6 +237,11 @@ local function buildLookup(): { [string]: any }
         getreg = getreg,
         getgc = getgc,
         getgcinfo = getgcinfo,
+        getsenv = getsenv,
+        getmenv = getmenv,
+        getfenv = getfenv,
+        setfenv = setfenv,
+        loadstring = loadstring,
 
         -- Instances
         getinstances = getinstances,
@@ -206,6 +254,9 @@ local function buildLookup(): { [string]: any }
         fireclickdetector = fireclickdetector,
         fireproximityprompt = fireproximityprompt,
         firetouchinterest = firetouchinterest,
+        isrenderobj = isrenderobj,
+        getrenderproperty = getrenderproperty,
+        setrenderproperty = setrenderproperty,
 
         -- Hooking
         getrawmetatable = getrawmetatable,
@@ -224,6 +275,9 @@ local function buildLookup(): { [string]: any }
         getnamecallmethod = getnamecallmethod,
         setnamecallmethod = setnamecallmethod,
         getcallingscript = getcallingscript,
+        setreadonly = setreadonly,
+        isreadonly = isreadonly,
+        checkcaller = checkcaller,
 
         -- Scripts
         getscriptbytecode = getscriptbytecode,
@@ -273,6 +327,21 @@ local function buildLookup(): { [string]: any }
         firesignal = firesignal,
         getcallbackvalue = getcallbackvalue,
 
+        -- Mouse
+        mousemoverel = mousemoverel,
+        mousemoveabs = mousemoveabs,
+        mouse1click = mouse1click,
+        mouse1press = mouse1press,
+        mouse1release = mouse1release,
+        mouse2click = mouse2click,
+        mouse2press = mouse2press,
+        mouse2release = mouse2release,
+
+        -- Input
+        keypress = keypress,
+        keyrelease = keyrelease,
+        iskeydown = iskeydown,
+
         -- Crypto
         crypt = crypt,
         base64_encode = base64_encode,
@@ -292,6 +361,8 @@ local function buildLookup(): { [string]: any }
         setfpscap = setfpscap,
         getfpscap = getfpscap,
         queue_on_teleport = queue_on_teleport,
+        getspecialinfo = getspecialinfo,
+        geturl = geturl,
     }
 end
 
