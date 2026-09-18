@@ -13,9 +13,6 @@ return {
         Resizable = true,
         AlwaysOnTop = false,
 
-        -- Remember size and position between sessions.
-        SavePosition = true,
-
         NotifySide = "Right",
         ShowCustomCursor = true,
         ToggleKeybind = "RightControl",
@@ -49,6 +46,9 @@ return {
     Configs = {
         Folder = "Abyssal",
         Autoload = nil,
+
+        -- Remember the window's size and position between sessions.
+        SaveWindowSize = true,
     },
 
     Tabs = {},

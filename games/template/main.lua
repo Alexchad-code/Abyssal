@@ -113,7 +113,7 @@ return function(ctx)
     local size = offset(windowConfig.Size, UDim2.fromOffset(720, 600))
     local position = offset(windowConfig.Position, UDim2.fromOffset(6, 6))
 
-    if windowConfig.SavePosition == true then
+    if configsConfig.SaveWindowSize == true then
         size = offset(state.Size, size)
         position = offset(state.Position, position)
     end
@@ -190,11 +190,11 @@ return function(ctx)
             end
         end
 
-        if windowConfig.SavePosition == true or themeConfig.Autoload == true then
+        if configsConfig.SaveWindowSize == true or themeConfig.Autoload == true then
             ctx.OnStop(function()
                 local out = {}
 
-                if windowConfig.SavePosition == true then
+                if configsConfig.SaveWindowSize == true then
                     local frame = window.MainFrame
 
                     if frame ~= nil then
