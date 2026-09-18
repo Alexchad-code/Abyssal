@@ -1,21 +1,3 @@
---[[
-    libs/tabs/home.lua
-
-    The Home tab: who you are, and the utilities every game wants.
-
-    Shared. Built by every game from libs/tabs, not copied into each one — so a
-    fix here reaches every game at once instead of needing an edit per game.
-    Games should not have their own copy of this file.
-
-    Two boxes:
-
-        Player   avatar headshot, name, id, account age, premium, copy id
-        General  watermark, server hop, rejoin
-
-    The avatar is the same thumbnail the Roblox website shows on a profile.
-    See the note on roundAvatar for why it is fiddly.
-]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
@@ -29,74 +11,50 @@ return {
         local library = ctx.Library
         local player = Players.LocalPlayer
 
+        local watermark = type(config.Watermark) == "table" and config.Watermark or {}
+        local notifications = type(config.Notifications) == "table" and config.Notifications or {}
+        local defaultDuration = tonumber(notifications.Duration) or 4
+
         local function notify(text: string, duration: number?)
             library:Notify({
                 Title = "Abyssal",
                 Text = text,
-                Duration = duration or 4,
+                Duration = duration or defaultDuration,
             })
         end
 
-        -- ── Player box ────────────────────────────────────────────────────
-
         local playerBox = tab:AddGroupbox({ Side = "Left", Name = "Player" })
 
-        --[[
-            rbxthumb://type=AvatarHeadShot is the image the website uses for a
-            profile picture or a friends-list entry. It renders straight into an
-            ImageLabel with no HTTP call, and the library already whitelists the
-            rbxthumb scheme.
-
-            420 is what the site requests. Smaller looks soft on a high-DPI
-            screen, and the cost is the same because Roblox caches it.
-        ]]
         local avatar = playerBox:AddImage("home.avatar", {
             Image = `rbxthumb://type=AvatarHeadShot&id={player.UserId}&w=420&h=420`,
             Height = 160,
             ScaleType = Enum.ScaleType.Fit,
         })
 
-        --[[
-            Round the avatar, because a profile picture is circular.
+        -- Obsidian builds an image as Holder > Box > ImageLabel. The box is a
+        -- bordered rectangle, so it has to be cleared for a circular avatar.
+        pcall(function()
+            local box = avatar.Holder:FindFirstChildOfClass("Frame")
 
-            Obsidian builds an image as Holder > Box > ImageLabel, where Box is
-            a bordered rectangle. Left alone you get a square photo in a box,
-            which does not read as a profile picture.
+            if box == nil then
+                return
+            end
 
-            So: clear the Box, crop the label to a square, round it with a
-            UICorner at 100%. Crop rather than Fit — Fit letterboxes, which is
-            wrong for a square headshot being masked into a circle.
+            box.BackgroundTransparency = 1
+            box.BorderSizePixel = 0
 
-            This reaches into the library's internal layout, which is a real
-            fragility. It is guarded, so if that layout ever changes the avatar
-            stays square instead of the script erroring.
-        ]]
-        local function roundAvatar(image: any)
-            pcall(function()
-                local box = image.Holder:FindFirstChildOfClass("Frame")
+            local imageLabel = box:FindFirstChildOfClass("ImageLabel")
 
-                if box == nil then
-                    return
-                end
+            if imageLabel == nil then
+                return
+            end
 
-                box.BackgroundTransparency = 1
-                box.BorderSizePixel = 0
+            imageLabel.ScaleType = Enum.ScaleType.Crop
 
-                local label = box:FindFirstChildOfClass("ImageLabel")
-
-                if label == nil then
-                    return
-                end
-
-                label.ScaleType = Enum.ScaleType.Crop
-
-                local corner = Instance.new("UICorner")
-                corner.CornerRadius = UDim.new(1, 0)
-                corner.Parent = label
-            end)
-        end
-
-        roundAvatar(avatar)
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(1, 0)
+            corner.Parent = imageLabel
+        end)
 
         playerBox:AddLabel(`{player.DisplayName}`)
         playerBox:AddLabel(`@{player.Name}`)
@@ -114,10 +72,7 @@ return {
 
         playerBox:AddLabel(`User ID   {player.UserId}`)
         playerBox:AddLabel(`Account   {accountAge()}`)
-
-        local premium = player.MembershipType == Enum.MembershipType.Premium
-
-        playerBox:AddLabel(`Premium   {premium and "yes" or "no"}`)
+        playerBox:AddLabel(`Premium   {player.MembershipType == Enum.MembershipType.Premium and "yes" or "no"}`)
 
         playerBox:AddButton({
             Text = "Copy User ID",
@@ -131,19 +86,17 @@ return {
             end,
         })
 
-        -- ── General box ───────────────────────────────────────────────────
-
         local general = tab:AddGroupbox({ Side = "Left", Name = "General" })
 
         general:AddToggle("home.watermark", {
             Text = "Watermark",
             Tooltip = "Shows the Abyssal watermark in the top left.",
-            Default = config.Watermark == true,
+            Default = watermark.Enabled == true,
         })
 
         general:AddInput("home.watermarkText", {
             Text = "Watermark label",
-            Default = config.WatermarkText or "Abyssal",
+            Default = watermark.Text or "Abyssal",
             Placeholder = "Abyssal",
         })
 
@@ -156,8 +109,8 @@ return {
                 local body, httpErr = ctx.Http(url)
 
                 if body == nil then
-                    ctx.Warn(`server list failed: {httpErr}`)
-                    notify("Could not list servers. Try again shortly.", 5)
+                    ctx.Warn(`server list: {httpErr}`)
+                    notify("Could not list servers.", 5)
                     return
                 end
 
@@ -185,18 +138,18 @@ return {
                 end
 
                 if best == nil then
-                    notify("No joinable server found. Try again shortly.", 5)
+                    notify("No joinable server found.", 5)
                     return
                 end
 
-                notify("Hopping to another server...", 3)
+                notify("Hopping...", 3)
 
                 local hopped, err = pcall(function()
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, best.id, player)
                 end)
 
                 if not hopped then
-                    ctx.Warn(`hop failed: {tostring(err)}`)
+                    ctx.Warn(`hop: {tostring(err)}`)
                     notify("Server hop failed.", 5)
                 end
             end,
@@ -212,44 +165,33 @@ return {
                     return
                 end
 
-                notify("Rejoining this server...", 3)
+                notify("Rejoining...", 3)
 
                 local ok, err = pcall(function()
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
                 end)
 
                 if not ok then
-                    ctx.Warn(`rejoin failed: {tostring(err)}`)
-                    notify("Rejoin failed. The server may have closed.", 5)
+                    ctx.Warn(`rejoin: {tostring(err)}`)
+                    notify("Rejoin failed.", 5)
                 end
             end,
         })
 
-        -- ── Watermark ─────────────────────────────────────────────────────
-
-        --[[
-            Built on first enable and destroyed on disable, rather than created
-            up front and hidden — an unused ScreenGui still costs a slot in the
-            render pass on a low-end device.
-
-            Two loops: a per-frame frame counter, and a 4 Hz text update. Text
-            nobody reads mid-frame does not need redrawing at frame rate, and
-            doing so is the easiest way to cost more than the feature is worth.
-        ]]
         local gui: ScreenGui? = nil
-        local label: TextLabel? = nil
+        local textLabel: TextLabel? = nil
         local textLoop: RBXScriptConnection? = nil
         local fpsCounter: RBXScriptConnection? = nil
         local lastTextUpdate = 0
         local frames, fps, fpsWindowStart = 0, 0, os.clock()
+
+        local textSize = tonumber(watermark.TextSize) or 14
 
         local function countFrame()
             frames += 1
 
             local now = os.clock()
 
-            -- Sampled once a second, so the figure is a real average rather
-            -- than a per-frame number that jitters by 30 either way.
             if now - fpsWindowStart >= 1 then
                 fps = frames
                 frames = 0
@@ -281,8 +223,6 @@ return {
             return `{text}  |  {player.Name}  |  {fps}fps  |  {ping}ms`
         end
 
-        -- gethui() is the executor's protected container and is what you want;
-        -- CoreGui can be cleared on some games. Neither is guaranteed.
         local function guiParent(): Instance
             if type(gethui) == "function" then
                 local ok, hui = pcall(gethui)
@@ -300,6 +240,10 @@ return {
                 return
             end
 
+            local position = watermark.Position
+            local x = type(position) == "table" and tonumber(position[1]) or 10
+            local y = type(position) == "table" and tonumber(position[2]) or 10
+
             local screen = Instance.new("ScreenGui")
             screen.Name = "AbyssalWatermark"
             screen.ResetOnSpawn = false
@@ -307,36 +251,36 @@ return {
             screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
             screen.Parent = guiParent()
 
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Name = "Label"
-            textLabel.BackgroundColor3 = library.Scheme.BackgroundColor
-            textLabel.BackgroundTransparency = 0.25
-            textLabel.BorderSizePixel = 0
-            textLabel.TextColor3 = library.Scheme.FontColor
-            textLabel.TextXAlignment = Enum.TextXAlignment.Left
-            textLabel.Font = Enum.Font.Code
-            textLabel.TextSize = 14
-            textLabel.Size = UDim2.new(0, 280, 0, 24)
-            textLabel.Position = UDim2.new(0, 10, 0, 10)
-            textLabel.Text = watermarkText()
-            textLabel.Parent = screen
+            local label = Instance.new("TextLabel")
+            label.Name = "Label"
+            label.BackgroundColor3 = library.Scheme.BackgroundColor
+            label.BackgroundTransparency = tonumber(watermark.Transparency) or 0.25
+            label.BorderSizePixel = 0
+            label.TextColor3 = library.Scheme.FontColor
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Font = Enum.Font.Code
+            label.TextSize = textSize
+            label.Size = UDim2.new(0, 280, 0, textSize + 10)
+            label.Position = UDim2.fromOffset(x, y)
+            label.Text = watermarkText()
+            label.Parent = screen
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 4)
-            corner.Parent = textLabel
+            corner.Parent = label
 
             local padding = Instance.new("UIPadding")
             padding.PaddingLeft = UDim.new(0, 6)
             padding.PaddingRight = UDim.new(0, 6)
-            padding.Parent = textLabel
+            padding.Parent = label
 
             gui = screen
-            label = textLabel
+            textLabel = label
 
             fpsCounter = RunService.RenderStepped:Connect(countFrame)
 
             textLoop = RunService.Heartbeat:Connect(function()
-                if label == nil then
+                if textLabel == nil then
                     return
                 end
 
@@ -347,7 +291,7 @@ return {
                 end
 
                 lastTextUpdate = now
-                label.Text = watermarkText()
+                textLabel.Text = watermarkText()
             end)
         end
 
@@ -367,12 +311,10 @@ return {
                 gui = nil
             end
 
-            label = nil
+            textLabel = nil
         end
 
         ctx.Toggles["home.watermark"]:OnChanged(function(enabled: boolean)
-            -- Always stop first: OnChanged fires on every change, so without
-            -- this, toggling on/off/on leaves two loops running.
             stopWatermark()
 
             if enabled then
@@ -380,12 +322,9 @@ return {
             end
         end)
 
-        -- The other exit: the user unloads the hub with the toggle still on.
         ctx.OnStop(stopWatermark)
 
-        -- A config load sets the toggle without firing OnChanged in some paths,
-        -- so honour the default explicitly.
-        if config.Watermark == true then
+        if watermark.Enabled == true then
             startWatermark()
         end
     end,

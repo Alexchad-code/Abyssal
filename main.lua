@@ -1,54 +1,11 @@
---[[
-    main.lua
-
-    The entry point. This is what a user executes:
-
-        loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/main.lua"
-        ))()
-
-    What it does:
-
-        1. fetch and load the UI library
-        2. build the shared context that every game receives
-        3. work out which folder in games/ covers this place
-        4. run that folder's main.lua
-        5. own the teardown
-
-    Nothing is pre-compiled and nothing is bundled. Every file is fetched at
-    run time, so pushing to main is the whole release process.
-
-    ─── Routing ──────────────────────────────────────────────────────────────
-
-    A game declares its own places, in games/<folder>/config.lua:
-
-        Places = { 2753915549 },
-
-    This file only lists which folders to look at. Adding a game is a folder
-    plus one line in GAMES — the place ids stay with the game, so there is one
-    source of truth for "where does this run" and it is not here.
-
-    The cost is one small fetch per game on boot to read its config. That is a
-    few hundred bytes each and happens once.
-]]
-
--- ══════════════════════════════════════════════════════════════ configuration
-
 local REPO = "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/"
 local VERSION = "0.3.0"
 
--- Every game folder in games/, by name. Order does not matter.
 local GAMES = {
     "template",
-
-    -- "blox-fruits",
-    -- "adopt-me",
 }
 
--- Set true to print debug lines.
 local DEBUG = false
-
--- ═══════════════════════════════════════════════════════════════════ logging
 
 local PREFIX = "[Abyssal]"
 
@@ -66,10 +23,6 @@ local function warn_(...: any)
     warn(PREFIX, ...)
 end
 
--- ════════════════════════════════════════════════════════════════════ http
-
--- Returns the body, or nil plus a reason. Never throws, so a failed fetch
--- produces a readable message instead of a stack trace.
 local function http(url: string): (string?, string?)
     local ok, body = pcall(function()
         return game:HttpGet(url)
@@ -86,16 +39,10 @@ local function http(url: string): (string?, string?)
     return body, nil
 end
 
--- Two ways to fetch, because they are not the same thing. Conflating them
--- produces a URL like "https://raw.githubusercontent.com/.../https://games.roblox.com/...".
---
---     Fetch("games/foo.lua")   -> relative to this repo
---     Http("https://...")      -> an absolute URL, e.g. a Roblox API
 local function fetch(path: string): (string?, string?)
     return http(REPO .. path)
 end
 
--- Fetches a Lua file from the repo and runs it, returning whatever it returns.
 local function loadFile(path: string): (any, string?)
     local source, fetchErr = fetch(path)
 
@@ -118,16 +65,6 @@ local function loadFile(path: string): (any, string?)
     return result
 end
 
--- ═════════════════════════════════════════════════════════════════ teardown
-
---[[
-    Game scripts register their cleanup here rather than doing it themselves.
-    Unload is the easy thing to get wrong: a script that forgets to disconnect
-    a loop leaves it running after the UI is gone, and the user sees the
-    symptom long after the cause.
-
-    Callbacks run in reverse — last registered, first stopped.
-]]
 local stopCallbacks: { () -> () } = {}
 local unloaded = false
 
@@ -135,7 +72,6 @@ local function onStop(callback: () -> ())
     table.insert(stopCallbacks, callback)
 end
 
--- Convenience for the common case of an RBXScriptConnection.
 local function track(connection: any)
     if connection ~= nil and connection.Disconnect ~= nil then
         onStop(function()
@@ -146,17 +82,12 @@ local function track(connection: any)
     end
 end
 
--- ═════════════════════════════════════════════════════════════════════ boot
-
 log(`v{VERSION} starting`)
 
--- 1. UI library.
 local librarySource, libraryErr = fetch("libs/obsidian.luau")
 
 if librarySource == nil then
-    -- Nothing can be shown without the library, so this is the one failure
-    -- that is fatal. It is also the failure a wrong REPO produces, so the
-    -- message names the file.
+
     error(`${PREFIX} cannot load libs/obsidian.luau — {libraryErr}`)
 end
 
@@ -169,7 +100,6 @@ end
 
 debug("library loaded")
 
--- 2. Shared context. Everything a game or tab can reach goes through this.
 local ctx = {
     Library = Library,
     Options = Library.Options,
@@ -179,21 +109,10 @@ local ctx = {
     JobId = game.JobId,
     Version = VERSION,
 
-    -- Set below once routing decides, and read by the game's main.lua.
     GameFolder = nil,
 
-    --[[
-        Tabs every game builds, loaded from libs/tabs.
-
-        They live here rather than in each game's tabs/ folder because they are
-        identical everywhere and one fix should not mean editing every game.
-        The list is here for the same reason — one copy, not one per game.
-
-        A game builds these first, then its own on top.
-    ]]
     SharedTabs = { "home", "ui-settings" },
 
-    -- Set by the game's main.lua.
     Window = nil,
     Configs = nil,
 
@@ -209,22 +128,6 @@ local ctx = {
     Track = track,
 }
 
--- 3. Routing. A game declares where it runs; this only asks each one.
---[[
-    Does this config claim the server we are in?
-
-    GameId is the universe id — every place in a game shares it, so declaring
-    it covers all of them without listing each place by hand. Places narrows to
-    specific ones, for a game that only wants some of its own places.
-
-    Either is enough; they are a union, not a fallback.
-
-    The rule for "everywhere" is narrow on purpose: BOTH fields must be absent.
-    A field that is present but wrong must not fall through to it — otherwise a
-    typo in GameId would load the script into every game on Roblox, which is
-    the worst possible failure for this function. 0 is the template's "not set"
-    placeholder and a non-numeric value is a typo; neither matches anything.
-]]
 local function claims(config: any): boolean
     local gameIdDeclared = config.GameId ~= nil
     local placesDeclared = config.Places ~= nil
@@ -278,7 +181,6 @@ end
 
 local folder = findGame()
 
--- 4. Run it, or explain why not.
 if folder ~= nil then
     ctx.GameFolder = folder
 
@@ -299,12 +201,6 @@ if folder ~= nil then
     end
 end
 
---[[
-    Nothing matched. Build a window anyway.
-
-    An empty screen reads as broken; a window naming the place id reads as
-    "this game is not supported yet", which is what is actually true.
-]]
 if ctx.Window == nil then
     log(`place {game.PlaceId} has no game folder`)
 
@@ -337,7 +233,6 @@ if ctx.Window == nil then
     })
 end
 
--- 5. Teardown.
 local function unload()
     if unloaded then
         return
@@ -365,7 +260,6 @@ pcall(function()
     Library:OnUnload(unload)
 end)
 
--- Exposed for the console:  getgenv().Abyssal.Unload()
 getgenv().Abyssal = {
     Version = VERSION,
     Context = ctx,
