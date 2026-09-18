@@ -209,7 +209,47 @@ local ctx = {
     Track = track,
 }
 
--- 3. Routing. A game declares its own places; this only asks each one.
+-- 3. Routing. A game declares where it runs; this only asks each one.
+--[[
+    Does this config claim the server we are in?
+
+    GameId is the universe id — every place in a game shares it, so declaring
+    it covers all of them without listing each place by hand. Places narrows to
+    specific ones, for a game that only wants some of its own places.
+
+    Either is enough; they are a union, not a fallback.
+
+    The rule for "everywhere" is narrow on purpose: BOTH fields must be absent.
+    A field that is present but wrong must not fall through to it — otherwise a
+    typo in GameId would load the script into every game on Roblox, which is
+    the worst possible failure for this function. 0 is the template's "not set"
+    placeholder and a non-numeric value is a typo; neither matches anything.
+]]
+local function claims(config: any): boolean
+    local gameIdDeclared = config.GameId ~= nil
+    local placesDeclared = config.Places ~= nil
+
+    if not gameIdDeclared and not placesDeclared then
+        return true
+    end
+
+    if gameIdDeclared then
+        local id = tonumber(config.GameId)
+
+        if id ~= nil and id ~= 0 and id == game.GameId then
+            return true
+        end
+    end
+
+    if placesDeclared and type(config.Places) == "table" then
+        if table.find(config.Places, game.PlaceId) ~= nil then
+            return true
+        end
+    end
+
+    return false
+end
+
 local function findGame(): string?
     local considered = {}
 
@@ -221,16 +261,10 @@ local function findGame(): string?
             warn_(`{folder}/config.lua: {err}`)
         elseif type(config) ~= "table" then
             warn_(`{folder}/config.lua must return a table`)
+        elseif claims(config) then
+            debug(`{folder} claims this server`)
+            return folder
         else
-            local places = config.Places
-
-            -- An empty or missing Places means "everywhere", matching how the
-            -- template documents it.
-            if places == nil or #places == 0 or table.find(places, game.PlaceId) then
-                debug(`{folder} covers place {game.PlaceId}`)
-                return folder
-            end
-
             table.insert(considered, name)
         end
     end

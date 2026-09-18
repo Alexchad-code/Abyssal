@@ -11,16 +11,31 @@
 ]]
 
 return {
+    -- ─── where this runs ──────────────────────────────────────────────────
+
     --[[
-        Which places this game covers.
+        The universe id — the game itself.
 
-        The number in the Roblox URL, or game.PlaceId from the executor console.
-        List every place — lobby and main game are usually different ids, and a
-        game that only lists one will load in the lobby and do nothing in the
-        actual game.
+        Every place in a game shares one universe, so this single number covers
+        all of them: lobby, main game, sub-places. Get it from game.GameId in
+        the executor console.
 
-        Empty means "everywhere", which is how the universal module works. Do
-        not leave it empty here unless you mean that.
+        Usually the only one of these two you need to set.
+    ]]
+    GameId = 0,
+
+    --[[
+        Specific places, if you want only some of the universe.
+
+        The number in the Roblox URL, or game.PlaceId. Use it when a game has
+        places you do not want the script to load in.
+
+        GameId and Places are a union — declaring either is enough to match.
+
+        Only removing BOTH fields entirely means "load everywhere". A field
+        that is present but wrong does not fall through to that, so a typo
+        cannot make this load in every game. 0 is the "not set" placeholder,
+        which is why the template matches nothing until you change one of them.
     ]]
     Places = { 0 },
 
