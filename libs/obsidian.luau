@@ -3,7 +3,7 @@
     https://github.com/deividcomsono/Obsidian
 
     Copyright (c) 2025 deividcomsono
-    Licensed under the MIT License. See LICENSE for the full text.
+    Licensed under the MIT License. See OBSIDIAN-LICENSE.txt for the full text.
 
     This notice must be retained in all copies or substantial portions of
     the Software, including minified and single-file bundles.

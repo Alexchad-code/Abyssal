@@ -1,19 +1,2 @@
-# Editors / OS
-.vscode/
-.idea/
-*.swp
-.DS_Store
-Thumbs.db
-
-# Luau tooling
-*.luac
-luau-analyze.log
-selene-report.json
-
-# Local scratch — not part of the project
-*.local.lua
-*.local.luau
-scratch/
-
-# Agent workspace metadata (memory, sessions)
+# Agent workspace metadata (memory, sessions) - not part of the project
 .workbuddy-ai/

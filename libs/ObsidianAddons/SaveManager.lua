@@ -1,3 +1,14 @@
+--[[
+    Obsidian UI Library - addon
+    https://github.com/deividcomsono/Obsidian
+
+    Copyright (c) 2025 deividcomsono
+    Licensed under the MIT License. See OBSIDIAN-LICENSE.txt for the full text.
+
+    This notice must be retained in all copies or substantial portions of
+    the Software.
+]]
+
 local cloneref = (cloneref or clonereference or function(instance: any)
     return instance
 end)
