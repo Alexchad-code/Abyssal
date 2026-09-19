@@ -21,7 +21,9 @@ return {
             })
         end
 
-        local playerBox = tab:AddGroupbox({ Side = "Left", Name = "Player" })
+        -- ── Player ────────────────────────────────────────────────────────
+
+        local playerBox = tab:AddGroupbox({ Side = "Left", Name = "Player", IconName = "user" })
 
         local avatar = playerBox:AddImage("home.avatar", {
             Image = `rbxthumb://type=AvatarHeadShot&id={player.UserId}&w=420&h=420`,
@@ -29,8 +31,6 @@ return {
             ScaleType = Enum.ScaleType.Fit,
         })
 
-        -- Obsidian builds an image as Holder > Box > ImageLabel. The box is a
-        -- bordered rectangle, so it has to be cleared for a circular avatar.
         pcall(function()
             local box = avatar.Holder:FindFirstChildOfClass("Frame")
 
@@ -68,9 +68,10 @@ return {
             return `{days}d`
         end
 
-        playerBox:AddLabel(`User ID   {player.UserId}`)
-        playerBox:AddLabel(`Account   {accountAge()}`)
-        playerBox:AddLabel(`Premium   {player.MembershipType == Enum.MembershipType.Premium and "yes" or "no"}`)
+        playerBox:AddLabel(`User ID     {player.UserId}`)
+        playerBox:AddLabel(`Account     {accountAge()}`)
+        playerBox:AddLabel(`Premium     {player.MembershipType == Enum.MembershipType.Premium and "yes" or "no"}`)
+        playerBox:AddLabel(`Server      {#Players:GetPlayers()}/{Players.MaxPlayers}`)
 
         playerBox:AddButton({
             Text = "Copy User ID",
@@ -84,21 +85,32 @@ return {
             end,
         })
 
-        local general = tab:AddGroupbox({ Side = "Left", Name = "General" })
+        -- ── Server ────────────────────────────────────────────────────────
 
-        general:AddToggle("home.watermark", {
-            Text = "Watermark",
-            Tooltip = "Shows the Abyssal watermark in the top left.",
-            Default = watermark.Enabled == true,
+        local serverBox = tab:AddGroupbox({ Side = "Left", Name = "Server", IconName = "server" })
+
+        serverBox:AddLabel(`Job ID      {game.JobId ~= "" and game.JobId or "unavailable"}`)
+        serverBox:AddLabel(`Place ID    {game.PlaceId}`)
+        serverBox:AddLabel(`Game ID     {game.GameId}`)
+
+        serverBox:AddButton({
+            Text = "Copy Job ID",
+            Tooltip = "JobId identifies this exact server.",
+            Func = function()
+                if game.JobId == nil or game.JobId == "" then
+                    notify("JobId is unavailable in this server.")
+                    return
+                end
+
+                local ok = pcall(function()
+                    setclipboard(game.JobId)
+                end)
+
+                notify(ok and `Copied {game.JobId}` or "Clipboard is unavailable.", 5)
+            end,
         })
 
-        general:AddInput("home.watermarkText", {
-            Text = "Watermark label",
-            Default = watermark.Text or "Abyssal",
-            Placeholder = "Abyssal",
-        })
-
-        general:AddButton({
+        serverBox:AddButton({
             Text = "Server Hop",
             Tooltip = "Moves you to the least populated joinable server.",
             DoubleClick = true,
@@ -153,7 +165,7 @@ return {
             end,
         })
 
-        general:AddButton({
+        serverBox:AddButton({
             Text = "Rejoin Server",
             Tooltip = "Returns you to this same server.",
             DoubleClick = true,
@@ -176,16 +188,18 @@ return {
             end,
         })
 
-        local gui: ScreenGui? = nil
-        local textLabel: TextLabel? = nil
-        local textLoop: RBXScriptConnection? = nil
-        local fpsCounter: RBXScriptConnection? = nil
-        local lastTextUpdate = 0
+        -- ── Client ────────────────────────────────────────────────────────
+
+        local clientBox = tab:AddGroupbox({ Side = "Right", Name = "Client", IconName = "activity" })
+
+        local fpsLabel = clientBox:AddLabel("FPS         --")
+        local pingLabel = clientBox:AddLabel("Ping        --")
+        local memoryLabel = clientBox:AddLabel("Memory      --")
+
         local frames, fps, fpsWindowStart = 0, 0, os.clock()
+        local lastUpdate = 0
 
-        local textSize = tonumber(watermark.TextSize) or 14
-
-        local function countFrame()
+        local fpsConnection = RunService.RenderStepped:Connect(function()
             frames += 1
 
             local now = os.clock()
@@ -195,7 +209,122 @@ return {
                 frames = 0
                 fpsWindowStart = now
             end
+        end)
+
+        local updateConnection = RunService.Heartbeat:Connect(function()
+            local now = os.clock()
+
+            if now - lastUpdate < 0.5 then
+                return
+            end
+
+            lastUpdate = now
+
+            local ping = 0
+            local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+
+            if pingStat ~= nil then
+                local ok, value = pcall(function()
+                    return pingStat:GetValue()
+                end)
+
+                if ok and type(value) == "number" then
+                    ping = math.floor(value)
+                end
+            end
+
+            local memory = 0
+            local ok, value = pcall(function()
+                return Stats:GetTotalMemoryUsageMb()
+            end)
+
+            if ok and type(value) == "number" then
+                memory = math.floor(value)
+            end
+
+            pcall(function()
+                fpsLabel:SetText(`FPS         {fps}`)
+                pingLabel:SetText(`Ping        {ping}ms`)
+                memoryLabel:SetText(`Memory      {memory} MB`)
+            end)
+        end)
+
+        ctx.OnStop(function()
+            fpsConnection:Disconnect()
+            updateConnection:Disconnect()
+        end)
+
+        -- ── Executor ──────────────────────────────────────────────────────
+
+        local executorBox = tab:AddGroupbox({ Side = "Right", Name = "Executor", IconName = "cpu" })
+
+        local UNC = ctx.LoadFile("libs/unctest.lua")
+
+        if UNC == nil then
+            executorBox:AddLabel("unctest.lua did not load")
+        else
+            executorBox:AddLabel(`Name        {UNC.Executor()}`)
+            executorBox:AddLabel(`Functions   {UNC.Summary()}`)
+
+            local complete = UNC.CompleteCategories()
+            local list = #complete > 0 and table.concat(complete, ", ") or "none"
+
+            executorBox:AddLabel(`Complete    {list}`)
+
+            executorBox:AddButton({
+                Text = "Print capability report",
+                Tooltip = "Writes the full table to the console.",
+                Func = function()
+                    UNC.Print()
+                    notify("Report printed to the console.", 5)
+                end,
+            })
         end
+
+        -- ── Hub ───────────────────────────────────────────────────────────
+
+        local hubBox = tab:AddGroupbox({ Side = "Right", Name = "Hub", IconName = "waves" })
+
+        hubBox:AddLabel(`Version     {ctx.Version or "?"}`)
+        hubBox:AddLabel(`Loaded in   {ctx.GameFolder or "?"}`)
+
+        hubBox:AddToggle("home.watermark", {
+            Text = "Watermark",
+            Tooltip = "Shows the Abyssal watermark in the top left.",
+            Default = watermark.Enabled == true,
+        })
+
+        hubBox:AddInput("home.watermarkText", {
+            Text = "Watermark label",
+            Default = watermark.Text or "Abyssal",
+            Placeholder = "Abyssal",
+        })
+
+        hubBox:AddDivider()
+
+        hubBox:AddButton({
+            Text = "Unload",
+            Tooltip = "Stops everything and closes the window.",
+            Risky = true,
+            DoubleClick = true,
+            Func = function()
+                local Abyssal = getgenv().Abyssal
+
+                if Abyssal ~= nil and Abyssal.Unload ~= nil then
+                    Abyssal.Unload()
+                else
+                    library:Unload()
+                end
+            end,
+        })
+
+        -- ── Watermark overlay ─────────────────────────────────────────────
+
+        local gui: ScreenGui? = nil
+        local textLabel: TextLabel? = nil
+        local textLoop: RBXScriptConnection? = nil
+        local lastTextUpdate = 0
+        local textSize = tonumber(watermark.TextSize) or 14
 
         local function watermarkText(): string
             local option = ctx.Options["home.watermarkText"]
@@ -258,7 +387,7 @@ return {
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Font = Enum.Font.Code
             label.TextSize = textSize
-            label.Size = UDim2.new(0, 280, 0, textSize + 10)
+            label.Size = UDim2.new(0, 300, 0, textSize + 10)
             label.Position = UDim2.fromOffset(x, y)
             label.Text = watermarkText()
             label.Parent = screen
@@ -274,8 +403,6 @@ return {
 
             gui = screen
             textLabel = label
-
-            fpsCounter = RunService.RenderStepped:Connect(countFrame)
 
             textLoop = RunService.Heartbeat:Connect(function()
                 if textLabel == nil then
@@ -297,11 +424,6 @@ return {
             if textLoop ~= nil then
                 textLoop:Disconnect()
                 textLoop = nil
-            end
-
-            if fpsCounter ~= nil then
-                fpsCounter:Disconnect()
-                fpsCounter = nil
             end
 
             if gui ~= nil then
