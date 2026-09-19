@@ -2,6 +2,7 @@ local REPO = "https://raw.githubusercontent.com/Alexchad-code/Abyssal/main/"
 local VERSION = "0.3.0"
 
 local GAMES = {
+    "universal",
     "template",
 }
 
@@ -128,12 +129,12 @@ local ctx = {
     Track = track,
 }
 
-local function claims(config: any): boolean
+local function matches(config: any): boolean
     local gameIdDeclared = config.GameId ~= nil
     local placesDeclared = config.Places ~= nil
 
     if not gameIdDeclared and not placesDeclared then
-        return true
+        return false
     end
 
     if gameIdDeclared then
@@ -153,8 +154,12 @@ local function claims(config: any): boolean
     return false
 end
 
+local function isUniversal(config: any): boolean
+    return config.GameId == nil and config.Places == nil
+end
+
 local function findGame(): string?
-    local considered = {}
+    local candidates = {}
 
     for _, name in GAMES do
         local folder = `games/{name}`
@@ -164,16 +169,23 @@ local function findGame(): string?
             warn_(`{folder}/config.lua: {err}`)
         elseif type(config) ~= "table" then
             warn_(`{folder}/config.lua must return a table`)
-        elseif claims(config) then
-            debug(`{folder} claims this server`)
-            return folder
         else
-            table.insert(considered, name)
+            table.insert(candidates, { folder = folder, config = config })
         end
     end
 
-    if #considered > 0 then
-        debug(`no match among: {table.concat(considered, ", ")}`)
+    for _, candidate in candidates do
+        if matches(candidate.config) then
+            debug(`{candidate.folder} matches`)
+            return candidate.folder
+        end
+    end
+
+    for _, candidate in candidates do
+        if isUniversal(candidate.config) then
+            debug(`falling back to {candidate.folder}`)
+            return candidate.folder
+        end
     end
 
     return nil
